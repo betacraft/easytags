@@ -27,20 +27,21 @@ func main() {
 		}
 	}
 	tagName := args[1]
-	// Parse the file containing this very example
+	// Parse the file given in arguments
 	f, err := parser.ParseFile(fset, args[0], nil, parser.ParseComments)
 	if err != nil {
 		fmt.Println("Error")
 		fmt.Println(err)
 		return
 	}
-
+	// read entire source file as a slice of lines
 	lines, err := readLines(args[0])
 	if err != nil {
 		fmt.Printf("Error reading file %v \n ", err)
 		return
 	}
-
+	// range over the objects in the scope of this generated AST and check for StructType. Then range over fields 
+	// contained in that struct.
 	for _, d := range f.Scope.Objects {
 		if d.Kind == ast.Typ {
 			ts, ok := d.Decl.(*ast.TypeSpec)
@@ -56,6 +57,7 @@ func main() {
 			for _, field := range x.Fields.List {
 				line := fset.File(field.Pos()).Line(field.Pos())
 				line = line - 1
+				// if tag for field doesn't exists, create one
 				if field.Tag == nil {
 					name := field.Names[0].String()
 					if debug {
@@ -66,6 +68,7 @@ func main() {
 						fmt.Printf("By line : %s \n", lines[line])
 					}
 				} else if !strings.Contains(field.Tag.Value, fmt.Sprintf("%s:", tagName)) {
+					// if tag exists, but doesn't contain target tag
 					name := field.Names[0].String()
 					if debug {
 						fmt.Printf("Replacing line %s \n ", lines[line])
@@ -80,6 +83,7 @@ func main() {
 			}
 		}
 	}
+	// overwrite the file with modified version of lines.
 	writeLines(lines, args[0])
 	cmd := exec.Command("go", "fmt", args[0])
 	cmd.Run()
