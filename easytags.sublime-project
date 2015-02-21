@@ -1,0 +1,16 @@
+{
+	"settings": {
+	        "GoSublime": {
+	            "env": {
+	            	"GOPATH": "$HOME/go-packages"
+	            }
+	        }
+	    },
+	"folders":
+	[
+		{
+			"follow_symlinks": true,
+			"path": "."
+		}
+	]
+}
