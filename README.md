@@ -5,8 +5,8 @@ We generally write Field names in CamelCase and we generally want them to be in 
 
 usage :
 
-> easytags {file_name} {tag_name} {debug (true/false) [optional]} 
->example: easytags file.go json true
+> easytags {file_name} {tag_name} 
+>example: easytags file.go json
 
 You can also use this with go generate 
 For example - In your source file, write following line 
