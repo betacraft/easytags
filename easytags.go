@@ -40,7 +40,7 @@ func main() {
 		fmt.Printf("Error reading file %v \n ", err)
 		return
 	}
-	// range over the objects in the scope of this generated AST and check for StructType. Then range over fields 
+	// range over the objects in the scope of this generated AST and check for StructType. Then range over fields
 	// contained in that struct.
 	for _, d := range f.Scope.Objects {
 		if d.Kind == ast.Typ {
@@ -57,6 +57,9 @@ func main() {
 			for _, field := range x.Fields.List {
 				line := fset.File(field.Pos()).Line(field.Pos())
 				line = line - 1
+				if len(field.Names) == 0 {
+					continue
+				}
 				// if tag for field doesn't exists, create one
 				if field.Tag == nil {
 					name := field.Names[0].String()
