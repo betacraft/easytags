@@ -12,18 +12,21 @@ import (
 	"unicode"
 )
 
-// generates snake case json tags so that you won't need to write them. Can be also exteded to xml or sql tags
 func main() {
-	fset := token.NewFileSet() // positions are relative to fset
 	args := os.Args[1:]
 	if len(args) < 2 {
-		fmt.Println("Usage : easytags {file_name} {tag_name} \n example: easytags file.go json true")
+		fmt.Println("Usage : easytags {file_name} {tag_name} \n example: easytags file.go json")
 		return
 	}
 
-	tagName := args[1]
+	GenerateTags(args[0], args[1])
+}
+
+// generates snake case json tags so that you won't need to write them. Can be also exteded to xml or sql tags
+func GenerateTags(fileName, tagName string) {
+	fset := token.NewFileSet() // positions are relative to fset
 	// Parse the file given in arguments
-	f, err := parser.ParseFile(fset, args[0], nil, parser.ParseComments)
+	f, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
 	if err != nil {
 		fmt.Println("Error")
 		fmt.Println(err)
@@ -58,8 +61,6 @@ func main() {
 				} else if !strings.Contains(field.Tag.Value, fmt.Sprintf("%s:", tagName)) {
 					// if tag exists, but doesn't contain target tag
 					name := field.Names[0].String()
-					field.Tag.ValuePos = field.Type.Pos() + 1
-					field.Tag.Kind = token.STRING
 					field.Tag.Value = fmt.Sprintf("`%s:\"%s\" %s`", tagName, ToSnake(name), strings.Replace(field.Tag.Value, "`", "", 2))
 				}
 			}
@@ -67,7 +68,7 @@ func main() {
 	}
 
 	// overwrite the file with modified version of ast.
-	write, err := os.Create(args[0])
+	write, err := os.Create(fileName)
 	if err != nil {
 		fmt.Printf("Error opening file %v", err)
 		return
