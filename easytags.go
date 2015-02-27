@@ -40,7 +40,7 @@ func GenerateTags(fileName, tagName string) {
 			ts, ok := d.Decl.(*ast.TypeSpec)
 			if !ok {
 				fmt.Printf("Unknown type without TypeSec: %v", d)
-				return
+				continue
 			}
 
 			x, ok := ts.Type.(*ast.StructType)
