@@ -1,6 +1,8 @@
 # easytags
 Easy json/xml Tag generation tool for golang
 
+[![Build Status](https://travis-ci.org/rainingclouds/easytags.svg?branch=master)](https://travis-ci.org/rainingclouds/easytags)
+
 We generally write Field names in CamelCase and we generally want them to be in snake case when marshalled to json/xml/sql etc. We use tags for this purpose. But it is a repeatative process which should be automated. 
 
 usage :
