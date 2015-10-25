@@ -35,37 +35,15 @@ func GenerateTags(fileName, tagName string) {
 
 	// range over the objects in the scope of this generated AST and check for StructType. Then range over fields
 	// contained in that struct.
-	for _, d := range f.Scope.Objects {
-		if d.Kind == ast.Typ {
-			ts, ok := d.Decl.(*ast.TypeSpec)
-			if !ok {
-				fmt.Printf("Unknown type without TypeSec: %v", d)
-				continue
-			}
 
-			x, ok := ts.Type.(*ast.StructType)
-			if !ok {
-				continue
-			}
-			for _, field := range x.Fields.List {
-				if len(field.Names) == 0 {
-					continue
-				}
-				// if tag for field doesn't exists, create one
-				if field.Tag == nil {
-					name := field.Names[0].String()
-					field.Tag = &ast.BasicLit{}
-					field.Tag.ValuePos = field.Type.Pos() + 1
-					field.Tag.Kind = token.STRING
-					field.Tag.Value = fmt.Sprintf("`%s:\"%s\"`", tagName, ToSnake(name))
-				} else if !strings.Contains(field.Tag.Value, fmt.Sprintf("%s:", tagName)) {
-					// if tag exists, but doesn't contain target tag
-					name := field.Names[0].String()
-					field.Tag.Value = fmt.Sprintf("`%s:\"%s\" %s`", tagName, ToSnake(name), strings.Replace(field.Tag.Value, "`", "", 2))
-				}
-			}
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch t := n.(type) {
+		case *ast.StructType:
+			processTags(t, tagName)
+			return false
 		}
-	}
+		return true
+	})
 
 	// overwrite the file with modified version of ast.
 	write, err := os.Create(fileName)
@@ -77,10 +55,30 @@ func GenerateTags(fileName, tagName string) {
 	w := bufio.NewWriter(write)
 	err = format.Node(w, fset, f)
 	if err != nil {
-		fmt.Printf("Error formating file", err)
+		fmt.Printf("Error formating file %s", err)
 		return
 	}
 	w.Flush()
+}
+
+func processTags(x *ast.StructType, tagName string) {
+	for _, field := range x.Fields.List {
+		if len(field.Names) == 0 {
+			continue
+		}
+		// if tag for field doesn't exists, create one
+		if field.Tag == nil {
+			name := field.Names[0].String()
+			field.Tag = &ast.BasicLit{}
+			field.Tag.ValuePos = field.Type.Pos() + 1
+			field.Tag.Kind = token.STRING
+			field.Tag.Value = fmt.Sprintf("`%s:\"%s\"`", tagName, ToSnake(name))
+		} else if !strings.Contains(field.Tag.Value, fmt.Sprintf("%s:", tagName)) {
+			// if tag exists, but doesn't contain target tag
+			name := field.Names[0].String()
+			field.Tag.Value = fmt.Sprintf("`%s:\"%s\" %s`", tagName, ToSnake(name), strings.Replace(field.Tag.Value, "`", "", 2))
+		}
+	}
 }
 
 // ToSnake convert the given string to snake case following the Golang format:
