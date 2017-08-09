@@ -14,12 +14,15 @@ import (
 
 func main() {
 	args := os.Args[1:]
-	if len(args) < 2 {
+	tp := "json"
+	if len(args) < 1 {
 		fmt.Println("Usage : easytags {file_name} {tag_name} \n example: easytags file.go json")
 		return
+	} else if len(args) == 2 {
+		tp = args[1]	
 	}
-
-	GenerateTags(args[0], args[1])
+	
+	GenerateTags(args[0], tp)
 }
 
 // generates snake case json tags so that you won't need to write them. Can be also exteded to xml or sql tags
