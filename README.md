@@ -23,3 +23,6 @@ And run
 >go generate
 
 This will go through all the struct declarations in your source files, and add corresponding json/xml tags with field name changed to snake case. If you have already written a tag, this tool will not change that tag.
+
+![Screencast with Go Generate] (https://media.giphy.com/media/26n6G34sQ4hV8HMgo/giphy.gif)
+
