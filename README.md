@@ -7,13 +7,17 @@ We generally write Field names in CamelCase and we generally want them to be in 
 
 usage :
 
-> easytags {file_name} {tag_name} 
->example: easytags file.go json
+> easytags {file_name} {tag_name (default:json)} 
+>example: easytags file.go 
 
 You can also use this with go generate 
 For example - In your source file, write following line 
 
->go:generate easytags filename.go json
+>go:generate easytags $GOFILE 
+
+or for xml
+
+>go:generate easytags $GOFILE xml
 
 And run
 >go generate
