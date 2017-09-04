@@ -7,22 +7,18 @@ We generally write Field names in CamelCase and we generally want them to be in 
 
 usage :
 
-> easytags {file_name} {tag_name (default:json)} 
+> easytags {file_name} {tag_name_1, tag_name_2} 
 >example: easytags file.go 
 
 You can also use this with go generate 
 For example - In your source file, write following line 
 
->go:generate easytags $GOFILE 
-
-or for xml
-
->go:generate easytags $GOFILE xml
+>go:generate easytags $GOFILE json,xml,sql
 
 And run
 >go generate
 
-This will go through all the struct declarations in your source files, and add corresponding json/xml tags with field name changed to snake case. If you have already written a tag, this tool will not change that tag.
+This will go through all the struct declarations in your source files, and add corresponding json/xml/sql tags with field name changed to snake case. If you have already written tag with "-" value , this tool will not change that tag.
 
 ![Screencast with Go Generate](https://media.giphy.com/media/26n6G34sQ4hV8HMgo/giphy.gif)
 
