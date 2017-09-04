@@ -14,19 +14,23 @@ import (
 
 func main() {
 	args := os.Args[1:]
-	tp := "json"
+	var tp []string
+
 	if len(args) < 1 {
 		fmt.Println("Usage : easytags {file_name} {tag_name} \n example: easytags file.go json")
 		return
 	} else if len(args) == 2 {
-		tp = args[1]	
+		provided := strings.Split(args[1], ",")
+		for _, e := range provided {
+			tp = append(tp, strings.TrimSpace(e))
+		}
 	}
-	
+
 	GenerateTags(args[0], tp)
 }
 
 // generates snake case json tags so that you won't need to write them. Can be also exteded to xml or sql tags
-func GenerateTags(fileName, tagName string) {
+func GenerateTags(fileName string, tagNames []string) {
 	fset := token.NewFileSet() // positions are relative to fset
 	// Parse the file given in arguments
 	f, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
@@ -42,7 +46,7 @@ func GenerateTags(fileName, tagName string) {
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch t := n.(type) {
 		case *ast.StructType:
-			processTags(t, tagName)
+			processTags(t, tagNames)
 			return false
 		}
 		return true
@@ -64,23 +68,42 @@ func GenerateTags(fileName, tagName string) {
 	w.Flush()
 }
 
-func processTags(x *ast.StructType, tagName string) {
+func parseTags(field *ast.Field, tags []string) string {
+	var tagValues []string
+	fieldName := field.Names[0].String()
+
+	for _, tag := range tags {
+		var value string
+		if strings.Contains(field.Tag.Value, fmt.Sprintf("%s:\"-\"", tag)) {
+			value = "-"
+		} else {
+			value = ToSnake(fieldName)
+		}
+
+		tagValues = append(tagValues, fmt.Sprintf("%s:\"%s\"", tag, value))
+	}
+
+	if len(tagValues) == 0 {
+		return ""
+	}
+
+	newValue := "`" + strings.Join(tagValues, " ") + "`"
+
+	return newValue
+}
+
+func processTags(x *ast.StructType, tagNames []string) {
 	for _, field := range x.Fields.List {
 		if len(field.Names) == 0 {
 			continue
 		}
-		// if tag for field doesn't exists, create one
-		if field.Tag == nil {
-			name := field.Names[0].String()
-			field.Tag = &ast.BasicLit{}
-			field.Tag.ValuePos = field.Type.Pos() + 1
-			field.Tag.Kind = token.STRING
-			field.Tag.Value = fmt.Sprintf("`%s:\"%s\"`", tagName, ToSnake(name))
-		} else if !strings.Contains(field.Tag.Value, fmt.Sprintf("%s:", tagName)) {
-			// if tag exists, but doesn't contain target tag
-			name := field.Names[0].String()
-			field.Tag.Value = fmt.Sprintf("`%s:\"%s\" %s`", tagName, ToSnake(name), strings.Replace(field.Tag.Value, "`", "", 2))
-		}
+
+		newTags := parseTags(field, tagNames)
+
+		field.Tag = &ast.BasicLit{}
+		field.Tag.ValuePos = field.Type.Pos() + 1
+		field.Tag.Kind = token.STRING
+		field.Tag.Value = newTags
 	}
 }
 
