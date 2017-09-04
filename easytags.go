@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"unicode"
+	"regexp"
 )
 
 func main() {
@@ -35,8 +36,7 @@ func GenerateTags(fileName string, tagNames []string) {
 	// Parse the file given in arguments
 	f, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
 	if err != nil {
-		fmt.Println("Error")
-		fmt.Println(err)
+		fmt.Printf("Error parsing file %v", err)
 		return
 	}
 
@@ -74,13 +74,15 @@ func parseTags(field *ast.Field, tags []string) string {
 
 	for _, tag := range tags {
 		var value string
-		if strings.Contains(field.Tag.Value, fmt.Sprintf("%s:\"-\"", tag)) {
-			value = "-"
+		existingTagReg := regexp.MustCompile(fmt.Sprintf("%s:\"[^\"]+\"", tag))
+		existingTag := existingTagReg.FindString(field.Tag.Value)
+		if existingTag != "" {
+			value = existingTag
 		} else {
-			value = ToSnake(fieldName)
+			value = fmt.Sprintf("%s:\"%s\"", tag, ToSnake(fieldName))
 		}
 
-		tagValues = append(tagValues, fmt.Sprintf("%s:\"%s\"", tag, value))
+		tagValues = append(tagValues, value)
 	}
 
 	if len(tagValues) == 0 {
@@ -98,11 +100,13 @@ func processTags(x *ast.StructType, tagNames []string) {
 			continue
 		}
 
-		newTags := parseTags(field, tagNames)
+		if field.Tag == nil {
+			field.Tag = &ast.BasicLit{}
+			field.Tag.ValuePos = field.Type.Pos() + 1
+			field.Tag.Kind = token.STRING
+		}
 
-		field.Tag = &ast.BasicLit{}
-		field.Tag.ValuePos = field.Type.Pos() + 1
-		field.Tag.Kind = token.STRING
+		newTags := parseTags(field, tagNames)
 		field.Tag.Value = newTags
 	}
 }
