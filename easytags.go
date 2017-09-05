@@ -2,37 +2,61 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
+	"regexp"
 	"strings"
 	"unicode"
 )
 
+const defaultTag = "json"
+const cmdUsage = `
+Usage : easytags [options] <file_name> [<tag names>]
+Examples:
+- Will add json and xml tags to struct fields
+	easytags file.go json,xml
+- Will remove all tags when -r flag used when no flags provided
+	easytag -r file.go
+Options:
+
+	-r removes all tags if none was provided`
+
 func main() {
-	args := os.Args[1:]
-	tp := "json"
+	remove := flag.Bool("r", false, "removes all tags if none was provided")
+	flag.Parse()
+
+	args := flag.Args()
+	var tagNames []string
+
 	if len(args) < 1 {
-		fmt.Println("Usage : easytags {file_name} {tag_name} \n example: easytags file.go json")
+		fmt.Println(cmdUsage)
 		return
 	} else if len(args) == 2 {
-		tp = args[1]	
+		provided := strings.Split(args[1], ",")
+		for _, e := range provided {
+			tagNames = append(tagNames, strings.TrimSpace(e))
+		}
 	}
-	
-	GenerateTags(args[0], tp)
+
+	if len(tagNames) == 0 && *remove == false {
+		tagNames = append(tagNames, defaultTag)
+	}
+
+	GenerateTags(args[0], tagNames)
 }
 
-// generates snake case json tags so that you won't need to write them. Can be also exteded to xml or sql tags
-func GenerateTags(fileName, tagName string) {
+// GenerateTags generates snake case json tags so that you won't need to write them. Can be also extended to xml or sql tags
+func GenerateTags(fileName string, tagNames []string) {
 	fset := token.NewFileSet() // positions are relative to fset
 	// Parse the file given in arguments
 	f, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
 	if err != nil {
-		fmt.Println("Error")
-		fmt.Println(err)
+		fmt.Printf("Error parsing file %v", err)
 		return
 	}
 
@@ -42,7 +66,7 @@ func GenerateTags(fileName, tagName string) {
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch t := n.(type) {
 		case *ast.StructType:
-			processTags(t, tagName)
+			processTags(t, tagNames)
 			return false
 		}
 		return true
@@ -64,23 +88,46 @@ func GenerateTags(fileName, tagName string) {
 	w.Flush()
 }
 
-func processTags(x *ast.StructType, tagName string) {
+func parseTags(field *ast.Field, tags []string) string {
+	var tagValues []string
+	fieldName := field.Names[0].String()
+
+	for _, tag := range tags {
+		var value string
+		existingTagReg := regexp.MustCompile(fmt.Sprintf("%s:\"[^\"]+\"", tag))
+		existingTag := existingTagReg.FindString(field.Tag.Value)
+		if existingTag != "" {
+			value = existingTag
+		} else {
+			value = fmt.Sprintf("%s:\"%s\"", tag, ToSnake(fieldName))
+		}
+
+		tagValues = append(tagValues, value)
+	}
+
+	if len(tagValues) == 0 {
+		return ""
+	}
+
+	newValue := "`" + strings.Join(tagValues, " ") + "`"
+
+	return newValue
+}
+
+func processTags(x *ast.StructType, tagNames []string) {
 	for _, field := range x.Fields.List {
 		if len(field.Names) == 0 {
 			continue
 		}
-		// if tag for field doesn't exists, create one
+
 		if field.Tag == nil {
-			name := field.Names[0].String()
 			field.Tag = &ast.BasicLit{}
 			field.Tag.ValuePos = field.Type.Pos() + 1
 			field.Tag.Kind = token.STRING
-			field.Tag.Value = fmt.Sprintf("`%s:\"%s\"`", tagName, ToSnake(name))
-		} else if !strings.Contains(field.Tag.Value, fmt.Sprintf("%s:", tagName)) {
-			// if tag exists, but doesn't contain target tag
-			name := field.Names[0].String()
-			field.Tag.Value = fmt.Sprintf("`%s:\"%s\" %s`", tagName, ToSnake(name), strings.Replace(field.Tag.Value, "`", "", 2))
 		}
+
+		newTags := parseTags(field, tagNames)
+		field.Tag.Value = newTags
 	}
 }
 
