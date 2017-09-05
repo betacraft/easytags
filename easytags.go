@@ -2,35 +2,55 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
+	"regexp"
 	"strings"
 	"unicode"
-	"regexp"
 )
 
+const defaultTag = "json"
+const cmdUsage = `
+Usage : easytags [options] <file_name> [<tag names>]
+Examples:
+- Will add json and xml tags to struct fields
+	easytags file.go json,xml
+- Will remove all tags when -r flag used when no flags provided
+	easytag -r file.go
+Options:
+
+	-r removes all tags if none was provided`
+
 func main() {
-	args := os.Args[1:]
-	var tp []string
+	remove := flag.Bool("r", false, "removes all tags if none was provided")
+	flag.Parse()
+
+	args := flag.Args()
+	var tagNames []string
 
 	if len(args) < 1 {
-		fmt.Println("Usage : easytags {file_name} {tag_name} \n example: easytags file.go json")
+		fmt.Println(cmdUsage)
 		return
 	} else if len(args) == 2 {
 		provided := strings.Split(args[1], ",")
 		for _, e := range provided {
-			tp = append(tp, strings.TrimSpace(e))
+			tagNames = append(tagNames, strings.TrimSpace(e))
 		}
 	}
 
-	GenerateTags(args[0], tp)
+	if len(tagNames) == 0 && *remove == false {
+		tagNames = append(tagNames, defaultTag)
+	}
+
+	GenerateTags(args[0], tagNames)
 }
 
-// generates snake case json tags so that you won't need to write them. Can be also exteded to xml or sql tags
+// GenerateTags generates snake case json tags so that you won't need to write them. Can be also extended to xml or sql tags
 func GenerateTags(fileName string, tagNames []string) {
 	fset := token.NewFileSet() // positions are relative to fset
 	// Parse the file given in arguments
