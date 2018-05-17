@@ -9,6 +9,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -46,8 +47,17 @@ func main() {
 	if len(tagNames) == 0 && *remove == false {
 		tagNames = append(tagNames, defaultTag)
 	}
-
-	GenerateTags(args[0], tagNames)
+	for _, arg := range args {
+		files, err := filepath.Glob(arg)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+			return
+		}
+		for _, f := range files {
+			GenerateTags(f, tagNames)
+		}
+	}
 }
 
 // GenerateTags generates snake case json tags so that you won't need to write them. Can be also extended to xml or sql tags
