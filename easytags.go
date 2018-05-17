@@ -129,6 +129,10 @@ func processTags(x *ast.StructType, tagNames []string) {
 		if len(field.Names) == 0 {
 			continue
 		}
+		if !unicode.IsUpper(rune(field.Names[0].String()[0])) {
+			// not exported
+			continue
+		}
 
 		if field.Tag == nil {
 			field.Tag = &ast.BasicLit{}
