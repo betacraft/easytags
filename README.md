@@ -20,5 +20,7 @@ And run
 
 This will go through all the struct declarations in your source files, and add corresponding json/xml/sql tags with field name changed to snake case. If you have already written tag with "-" value , this tool will not change that tag.
 
+Now supports Go modules.
+
 ![Screencast with Go Generate](https://media.giphy.com/media/26n6G34sQ4hV8HMgo/giphy.gif)
 
