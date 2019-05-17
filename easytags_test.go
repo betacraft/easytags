@@ -14,11 +14,13 @@ func TestGenerateTags(t *testing.T) {
 		t.Errorf("Error reading file %v", err)
 	}
 	defer ioutil.WriteFile("testfile.go", testCode, 0644)
-	GenerateTags("testfile.go", []string{"json"})
+	GenerateTags("testfile.go", []string{"json"}, false)
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "testfile.go", nil, parser.ParseComments)
 	if err != nil {
 		t.Errorf("Error parsing generated file %v", err)
+		genFile, _ := ioutil.ReadFile("testfile.go")
+		t.Errorf("\n%s",genFile)
 		return
 	}
 
@@ -56,6 +58,12 @@ func TestGenerateTags(t *testing.T) {
 				} else if field.Tag.Value != "`json:\"test_field2\"`" {
 					t.Error("Snake case tag should be generated for TestField2")
 				}
+			} else if name == "ExistingTag" {
+				if field.Tag == nil {
+					t.Error("Tag should be generated for TestFiled2")
+				} else if field.Tag.Value != "`custom:\"\" json:\"etag\"`" {
+					t.Error("existing tag should not be modified, instead found ", field.Tag.Value)
+				}
 			}
 
 		}
@@ -68,7 +76,7 @@ func TestGenerateTags_Multiple(t *testing.T) {
 		t.Errorf("Error reading file %v", err)
 	}
 	defer ioutil.WriteFile("testfile.go", testCode, 0644)
-	GenerateTags("testfile.go", []string{"json", "xml"})
+	GenerateTags("testfile.go", []string{"json", "xml"}, false)
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "testfile.go", nil, parser.ParseComments)
 	if err != nil {
@@ -110,6 +118,12 @@ func TestGenerateTags_Multiple(t *testing.T) {
 				} else if field.Tag.Value != "`json:\"test_field2\" xml:\"test_field2\"`" {
 					t.Error("Snake case tag should be generated for TestField2")
 				}
+			} else if name == "ExistingTag" {
+				if field.Tag == nil {
+					t.Error("Tag should be generated for TestFiled2")
+				} else if field.Tag.Value != "`custom:\"\" json:\"etag\" xml:\"existing_tag\"`" {
+					t.Error("new tag should be appended to existing tag, instead found ", field.Tag.Value)
+				}
 			}
 
 		}
@@ -122,7 +136,7 @@ func TestGenerateTags_RemoveAll(t *testing.T) {
 		t.Errorf("Error reading file %v", err)
 	}
 	defer ioutil.WriteFile("testfile.go", testCode, 0644)
-	GenerateTags("testfile.go", []string{})
+	GenerateTags("testfile.go", []string{}, true)
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "testfile.go", nil, parser.ParseComments)
 	if err != nil {
