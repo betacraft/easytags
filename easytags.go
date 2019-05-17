@@ -55,13 +55,13 @@ func main() {
 			return
 		}
 		for _, f := range files {
-			GenerateTags(f, tagNames)
+			GenerateTags(f, tagNames,*remove)
 		}
 	}
 }
 
 // GenerateTags generates snake case json tags so that you won't need to write them. Can be also extended to xml or sql tags
-func GenerateTags(fileName string, tagNames []string) {
+func GenerateTags(fileName string, tagNames []string, remove bool) {
 	fset := token.NewFileSet() // positions are relative to fset
 	// Parse the file given in arguments
 	f, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
@@ -76,7 +76,7 @@ func GenerateTags(fileName string, tagNames []string) {
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch t := n.(type) {
 		case *ast.StructType:
-			processTags(t, tagNames)
+			processTags(t, tagNames, remove)
 			return false
 		}
 		return true
@@ -101,36 +101,38 @@ func GenerateTags(fileName string, tagNames []string) {
 func parseTags(field *ast.Field, tags []string) string {
 	var tagValues []string
 	fieldName := field.Names[0].String()
-
 	for _, tag := range tags {
 		var value string
 		existingTagReg := regexp.MustCompile(fmt.Sprintf("%s:\"[^\"]+\"", tag))
 		existingTag := existingTagReg.FindString(field.Tag.Value)
-		if existingTag != "" {
-			value = existingTag
-		} else {
+		if existingTag == "" {
 			value = fmt.Sprintf("%s:\"%s\"", tag, ToSnake(fieldName))
+			tagValues = append(tagValues, value)
 		}
 
-		tagValues = append(tagValues, value)
 	}
+	updatedTags := strings.Fields(strings.Trim(field.Tag.Value,"`"))
 
-	if len(tagValues) == 0 {
-		return ""
+	if len(tagValues) > 0 {
+		updatedTags = append(updatedTags,tagValues...)
 	}
-
-	newValue := "`" + strings.Join(tagValues, " ") + "`"
+	newValue := "`" + strings.Join(updatedTags," ") + "`"
 
 	return newValue
 }
 
-func processTags(x *ast.StructType, tagNames []string) {
+func processTags(x *ast.StructType, tagNames []string, remove bool) {
 	for _, field := range x.Fields.List {
 		if len(field.Names) == 0 {
 			continue
 		}
 		if !unicode.IsUpper(rune(field.Names[0].String()[0])) {
 			// not exported
+			continue
+		}
+
+		if remove {
+			field.Tag = nil
 			continue
 		}
 
