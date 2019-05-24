@@ -16,23 +16,29 @@ import (
 )
 
 const defaultTag = "json"
+const defaultCase = "snake"
 const cmdUsage = `
-Usage : easytags [options] <file_name> [<tag names>]
+Usage : easytags [options] <file_name> [<tag:case>]
 Examples:
-- Will add json and xml tags to struct fields
-	easytags file.go json,xml
+- Will add json in camel case and xml in default case (snake) tags to struct fields
+	easytags file.go json:camel,xml
 - Will remove all tags when -r flag used when no flags provided
 	easytag -r file.go
 Options:
 
 	-r removes all tags if none was provided`
 
+type TagOpt struct {
+	Tag  string
+	Case string
+}
+
 func main() {
 	remove := flag.Bool("r", false, "removes all tags if none was provided")
 	flag.Parse()
 
 	args := flag.Args()
-	var tagNames []string
+	var tags []*TagOpt
 
 	if len(args) < 1 {
 		fmt.Println(cmdUsage)
@@ -40,12 +46,17 @@ func main() {
 	} else if len(args) == 2 {
 		provided := strings.Split(args[1], ",")
 		for _, e := range provided {
-			tagNames = append(tagNames, strings.TrimSpace(e))
+			t := strings.SplitN(strings.TrimSpace(e), ":", 2)
+			tag := &TagOpt{t[0], defaultCase}
+			if len(t) == 2 {
+				tag.Case = t[1]
+			}
+			tags = append(tags, tag)
 		}
 	}
 
-	if len(tagNames) == 0 && *remove == false {
-		tagNames = append(tagNames, defaultTag)
+	if len(tags) == 0 && *remove == false {
+		tags = append(tags, &TagOpt{defaultTag, defaultCase})
 	}
 	for _, arg := range args {
 		files, err := filepath.Glob(arg)
@@ -55,13 +66,13 @@ func main() {
 			return
 		}
 		for _, f := range files {
-			GenerateTags(f, tagNames,*remove)
+			GenerateTags(f, tags, *remove)
 		}
 	}
 }
 
 // GenerateTags generates snake case json tags so that you won't need to write them. Can be also extended to xml or sql tags
-func GenerateTags(fileName string, tagNames []string, remove bool) {
+func GenerateTags(fileName string, tags []*TagOpt, remove bool) {
 	fset := token.NewFileSet() // positions are relative to fset
 	// Parse the file given in arguments
 	f, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
@@ -76,7 +87,7 @@ func GenerateTags(fileName string, tagNames []string, remove bool) {
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch t := n.(type) {
 		case *ast.StructType:
-			processTags(t, tagNames, remove)
+			processTags(t, tags, remove)
 			return false
 		}
 		return true
@@ -98,30 +109,41 @@ func GenerateTags(fileName string, tagNames []string, remove bool) {
 	w.Flush()
 }
 
-func parseTags(field *ast.Field, tags []string) string {
+func parseTags(field *ast.Field, tags []*TagOpt) string {
 	var tagValues []string
 	fieldName := field.Names[0].String()
 	for _, tag := range tags {
 		var value string
-		existingTagReg := regexp.MustCompile(fmt.Sprintf("%s:\"[^\"]+\"", tag))
+		existingTagReg := regexp.MustCompile(fmt.Sprintf("%s:\"[^\"]+\"", tag.Tag))
 		existingTag := existingTagReg.FindString(field.Tag.Value)
 		if existingTag == "" {
-			value = fmt.Sprintf("%s:\"%s\"", tag, ToSnake(fieldName))
+			var name string
+			switch tag.Case {
+			case "snake":
+				name = ToSnake(fieldName)
+			case "camel":
+				name = ToCamel(fieldName)
+			case "pascal":
+				name = fieldName
+			default:
+				fmt.Printf("Unknown case option %s", tag.Case)
+			}
+			value = fmt.Sprintf("%s:\"%s\"", tag.Tag, name)
 			tagValues = append(tagValues, value)
 		}
 
 	}
-	updatedTags := strings.Fields(strings.Trim(field.Tag.Value,"`"))
+	updatedTags := strings.Fields(strings.Trim(field.Tag.Value, "`"))
 
 	if len(tagValues) > 0 {
-		updatedTags = append(updatedTags,tagValues...)
+		updatedTags = append(updatedTags, tagValues...)
 	}
-	newValue := "`" + strings.Join(updatedTags," ") + "`"
+	newValue := "`" + strings.Join(updatedTags, " ") + "`"
 
 	return newValue
 }
 
-func processTags(x *ast.StructType, tagNames []string, remove bool) {
+func processTags(x *ast.StructType, tags []*TagOpt, remove bool) {
 	for _, field := range x.Fields.List {
 		if len(field.Names) == 0 {
 			continue
@@ -142,7 +164,7 @@ func processTags(x *ast.StructType, tagNames []string, remove bool) {
 			field.Tag.Kind = token.STRING
 		}
 
-		newTags := parseTags(field, tagNames)
+		newTags := parseTags(field, tags)
 		field.Tag.Value = newTags
 	}
 }
@@ -162,4 +184,23 @@ func ToSnake(in string) string {
 		out = append(out, unicode.ToLower(runes[i]))
 	}
 	return string(out)
+}
+
+// ToLowerCamel convert the given string to camelCase
+func ToCamel(in string) string {
+	runes := []rune(in)
+	length := len(runes)
+
+	var i int
+	for i = 0; i < length; i++ {
+		if unicode.IsLower(runes[i]) {
+			break
+		}
+		runes[i] = unicode.ToLower(runes[i])
+	}
+	if i != 1 && i != length {
+		i--
+		runes[i] = unicode.ToUpper(runes[i])
+	}
+	return string(runes)
 }
