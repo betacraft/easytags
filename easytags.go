@@ -73,17 +73,16 @@ func main() {
 
 // GenerateTags generates snake case json tags so that you won't need to write them. Can be also extended to xml or sql tags
 func GenerateTags(fileName string, tags []*TagOpt, remove bool) {
-	fset := token.NewFileSet() // positions are relative to fset
+	fSet := token.NewFileSet() // positions are relative to fSet
 	// Parse the file given in arguments
-	f, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
+	f, err := parser.ParseFile(fSet, fileName, nil, parser.ParseComments)
 	if err != nil {
 		fmt.Printf("Error parsing file %v", err)
 		return
 	}
 
-	// range over the objects in the scope of this generated AST and check for StructType. Then range over fields
+	// Range over the objects in the scope of this generated AST and check for StructType. Then range over fields
 	// contained in that struct.
-
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch t := n.(type) {
 		case *ast.StructType:
@@ -93,20 +92,30 @@ func GenerateTags(fileName string, tags []*TagOpt, remove bool) {
 		return true
 	})
 
-	// overwrite the file with modified version of ast.
+	// Overwrite the file with modified version of ast.
 	write, err := os.Create(fileName)
 	if err != nil {
 		fmt.Printf("Error opening file %v", err)
 		return
 	}
-	defer write.Close()
+	defer func() {
+		err := write.Close()
+		if err != nil {
+			fmt.Printf("Errror writing file %v", err)
+		}
+	}()
 	w := bufio.NewWriter(write)
-	err = format.Node(w, fset, f)
+	err = format.Node(w, fSet, f)
 	if err != nil {
 		fmt.Printf("Error formating file %s", err)
 		return
 	}
-	w.Flush()
+	defer func() {
+		err := w.Flush()
+		if err != nil {
+			fmt.Printf("Error writing file %v", err)
+		}
+	}()
 }
 
 func parseTags(field *ast.Field, tags []*TagOpt) string {
@@ -117,21 +126,40 @@ func parseTags(field *ast.Field, tags []*TagOpt) string {
 		existingTagReg := regexp.MustCompile(fmt.Sprintf("%s:\"[^\"]+\"", tag.Tag))
 		existingTag := existingTagReg.FindString(field.Tag.Value)
 		if existingTag == "" {
+			tName := strings.ToLower(tag.Tag)
 			var name string
-			switch tag.Case {
-			case "snake":
-				name = ToSnake(fieldName)
-			case "camel":
-				name = ToCamel(fieldName)
-			case "pascal":
-				name = fieldName
-			default:
-				fmt.Printf("Unknown case option %s", tag.Case)
+			switch {
+			case tName == "json" || tName == "xml":
+				switch tag.Case {
+				case "snake":
+					name = ToSnake(fieldName)
+				case "camel":
+					name = ToCamel(fieldName)
+				case "pascal":
+					name = fieldName
+				default:
+					fmt.Printf("Unknown case option %s", tag.Case)
+				}
+
+			case tName == "swaggertype":
+				fType := strings.ToLower(fmt.Sprint(field.Type))
+				switch {
+				case strings.Contains(fType, "int"):
+					name = "integer"
+				case strings.Contains(fType, "string"):
+					name = "string"
+				case strings.Contains(fType, "time"):
+					name = "number"
+				case strings.Contains(fType, "float"):
+					name = "number"
+				case strings.Contains(fType, "bool"):
+					name = "boolean"
+				}
+
 			}
 			value = fmt.Sprintf("%s:\"%s\"", tag.Tag, name)
 			tagValues = append(tagValues, value)
 		}
-
 	}
 	updatedTags := strings.Fields(strings.Trim(field.Tag.Value, "`"))
 
@@ -152,12 +180,10 @@ func processTags(x *ast.StructType, tags []*TagOpt, remove bool) {
 			// not exported
 			continue
 		}
-
 		if remove {
 			field.Tag = nil
 			continue
 		}
-
 		if field.Tag == nil {
 			field.Tag = &ast.BasicLit{}
 			field.Tag.ValuePos = field.Type.Pos() + 1
